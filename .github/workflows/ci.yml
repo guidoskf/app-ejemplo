@@ -48,10 +48,11 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           ref: main
 
-      - name: Actualizar tag en values.yaml
+      - name: Actualizar appVersion en Chart.yaml
         run: |
-          TAG=$(echo ${{ github.sha }} | cut -c1-7)
-          yq eval ".image.tag = \"$TAG\"" -i values.yaml
+          TAG="main-$(echo ${{ github.sha }} | cut -c1-7)"
+          yq eval ".appVersion = \"$TAG\"" -i Chart.yaml
+          cat Chart.yaml
 
       - name: Commit y Push a app-chart
         run: |
