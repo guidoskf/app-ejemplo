@@ -35,3 +35,66 @@ jobs:
           docker build -t $IMAGE_TAG -t $IMAGE_LATEST .
           docker push $IMAGE_TAG
           docker push $IMAGE_LATEST
+
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  APP_NAME: gitops-argocd-demo
+  DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extraer SHA corto del commit
+        id: vars
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Construir y subir imagen etiquetada
+        run: |
+          IMAGE_TAG="${DOCKER_USER}/${APP_NAME}:${{ env.SHORT_SHA }}"
+          IMAGE_LATEST="${DOCKER_USER}/${APP_NAME}:latest"
+
+          docker build -t $IMAGE_TAG -t $IMAGE_LATEST .
+          docker push $IMAGE_TAG
+          docker push $IMAGE_LATEST
+
+  update-manifest:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio app-chart
+        uses: actions/checkout@v3
+        with:
+          repository: guidoskf/app-chart
+          token: ${{ secrets.GH_PAT }}
+          ref: main
+
+      - name: Actualizar tag en values.yaml
+        run: |
+          TAG=$(echo ${{ github.sha }} | cut -c1-7)
+          yq eval ".image.tag = \"$TAG\"" -i values.yaml
+
+      - name: Commit y Push a app-chart
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add values.yaml
+          git commit -m "update image tag to ${{ github.sha }}" || exit 0
+          git push origin main
