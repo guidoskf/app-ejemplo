@@ -36,7 +36,7 @@ jobs:
           docker push $IMAGE_TAG
           docker push $IMAGE_LATEST
 
-  update-manifest:
+update-manifest:
     needs: build-and-push
     runs-on: ubuntu-latest
 
@@ -50,14 +50,21 @@ jobs:
 
       - name: Actualizar appVersion en Chart.yaml
         run: |
+          # Formateamos el tag tal como lo usa el profesor
           TAG="main-$(echo ${{ github.sha }} | cut -c1-7)"
+          
+          # Actualizamos el campo appVersion en Chart.yaml
           yq eval ".appVersion = \"$TAG\"" -i Chart.yaml
+          
+          # Imprimimos el archivo en los logs de Actions para verificar el cambio
           cat Chart.yaml
 
       - name: Commit y Push a app-chart
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add values.yaml
-          git commit -m "update image tag to ${{ github.sha }}" || exit 0
+          git add Chart.yaml
+          
+          # Realizamos el commit y forzamos el push
+          git commit -m "update appVersion to main-${{ github.sha }}"
           git push origin main
